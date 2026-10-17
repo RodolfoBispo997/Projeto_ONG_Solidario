@@ -5,6 +5,8 @@ import {
   listarCampanhasPublicas,
   buscarCampanhaPorId,
   editarCampanha,
+  cancelarCampanha,
+  calcularProgresso,
 } from "../services/campaigns.service.js";
 
 export async function buscarCategorias(req: Request, res: Response) {
@@ -105,7 +107,15 @@ export async function buscarCampanhasPublicas(req: Request, res: Response) {
       typeof city === "string" ? city.trim() : undefined,
     );
 
-    return res.status(200).json(campanhas);
+    return res.status(200).json(
+      campanhas.map((campanha) => ({
+        ...campanha,
+        progress: calcularProgresso(
+          campanha.receivedQuantity,
+          campanha.goalQuantity,
+        ),
+      })),
+    );
   } catch {
     return res.status(500).json({
       message: "Erro ao listar campanhas",
@@ -131,7 +141,13 @@ export async function detalhesCampanha(req: Request, res: Response) {
       });
     }
 
-    return res.status(200).json(campanha);
+    return res.status(200).json({
+      ...campanha,
+      progress: calcularProgresso(
+        campanha.receivedQuantity,
+        campanha.goalQuantity,
+      ),
+    });
   } catch {
     return res.status(500).json({
       message: "Erro ao buscar campanha",
@@ -231,6 +247,46 @@ export async function atualizarCampanha(req: Request, res: Response) {
 
     return res.status(500).json({
       message: "Erro ao editar campanha",
+    });
+  }
+}
+
+export async function cancelarCampanhaController(req: Request, res: Response) {
+  const id = req.params.id;
+
+  if (typeof id !== "string" || !id.trim()) {
+    return res.status(400).json({
+      message: "ID inválido",
+    });
+  }
+
+  try {
+    const campanha = await cancelarCampanha(id, res.locals.user.id);
+
+    return res.status(200).json(campanha);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "Campanha não encontrada") {
+        return res.status(404).json({
+          message: error.message,
+        });
+      }
+
+      if (error.message === "Acesso não permitido") {
+        return res.status(403).json({
+          message: error.message,
+        });
+      }
+
+      if (error.message === "Campanha não pode ser cancelada") {
+        return res.status(409).json({
+          message: error.message,
+        });
+      }
+    }
+
+    return res.status(500).json({
+      message: "Erro ao cancelar campanha",
     });
   }
 }

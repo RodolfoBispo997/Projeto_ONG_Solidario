@@ -186,3 +186,39 @@ export async function editarCampanha(
     },
   });
 }
+
+export async function cancelarCampanha(id: string, userId: string) {
+  const campanha = await prisma.campaign.findUnique({
+    where: { id },
+    include: { organization: true },
+  });
+
+  if (!campanha) {
+    throw new Error("Campanha não encontrada");
+  }
+
+  if (campanha.organization.userId !== userId) {
+    throw new Error("Acesso não permitido");
+  }
+
+  if (campanha.status === "CANCELED" || campanha.status === "COMPLETED") {
+    throw new Error("Campanha não pode ser cancelada");
+  }
+
+  return prisma.campaign.update({
+    where: { id },
+    data: {
+      status: "CANCELED",
+    },
+  });
+}
+
+export function calcularProgresso(recebido: number, meta: number) {
+  if (meta <= 0) {
+    return 0;
+  }
+
+  const porcentagem = (recebido / meta) * 100;
+
+  return Math.min(100, Math.round(porcentagem));
+}

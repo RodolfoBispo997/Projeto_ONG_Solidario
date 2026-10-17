@@ -3,6 +3,7 @@ import {
   atualizarCampanha,
   buscarCampanhasPublicas,
   buscarCategorias,
+  cancelarCampanhaController,
   detalhesCampanha,
 } from "../controllers/campaigns.controller.js";
 import { cadastrarCampanha } from "../controllers/campaigns.controller.js";
@@ -20,5 +21,12 @@ router.get("/campaigns", buscarCampanhasPublicas);
 router.get("/campaigns/:id", detalhesCampanha);
 
 router.patch("/campaigns/:id", autenticar, autorizar("NGO"), atualizarCampanha);
+
+router.patch(
+  "/campaigns/:id/cancel",
+  autenticar,
+  autorizar("NGO"),
+  cancelarCampanhaController,
+);
 
 export default router;

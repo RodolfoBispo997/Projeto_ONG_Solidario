@@ -7,6 +7,7 @@ import {
   editarCampanha,
   cancelarCampanha,
   calcularProgresso,
+  concluirCampanha,
 } from "../services/campaigns.service.js";
 
 export async function buscarCategorias(req: Request, res: Response) {
@@ -288,5 +289,23 @@ export async function cancelarCampanhaController(req: Request, res: Response) {
     return res.status(500).json({
       message: "Erro ao cancelar campanha",
     });
+  }
+}
+
+export async function concluirCampanhaController(req: Request, res: Response) {
+  const id = req.params.id;
+  if (typeof id !== "string" || !id.trim()) {
+    return res.status(400).json({ message: "ID inválido" });
+  }
+  try {
+    return res.status(200).json(await concluirCampanha(id, res.locals.user.id));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const status: Record<string, number> = {
+      "Campanha não encontrada": 404,
+      "Acesso não permitido": 403,
+      "Campanha não pode ser concluída": 409,
+    };
+    return res.status(status[message] ?? 500).json({ message: status[message] ? message : "Erro ao concluir campanha" });
   }
 }

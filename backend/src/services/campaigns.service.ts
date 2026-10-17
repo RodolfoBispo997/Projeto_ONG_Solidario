@@ -188,28 +188,38 @@ export async function editarCampanha(
 }
 
 export async function cancelarCampanha(id: string, userId: string) {
+  return prisma.$transaction(async (tx) => {
+    const campanha = await tx.campaign.findUnique({
+      where: { id },
+      include: { organization: true },
+    });
+    if (!campanha) throw new Error("Campanha não encontrada");
+    if (campanha.organization.userId !== userId)
+      throw new Error("Acesso não permitido");
+    if (campanha.status === "CANCELED" || campanha.status === "COMPLETED") {
+      throw new Error("Campanha não pode ser cancelada");
+    }
+    await tx.donation.updateMany({
+      where: { campaignId: id, status: "PENDING" },
+      data: { status: "CANCELED" },
+    });
+    return tx.campaign.update({ where: { id }, data: { status: "CANCELED" } });
+  });
+}
+
+export async function concluirCampanha(id: string, userId: string) {
   const campanha = await prisma.campaign.findUnique({
     where: { id },
     include: { organization: true },
   });
-
-  if (!campanha) {
-    throw new Error("Campanha não encontrada");
-  }
-
-  if (campanha.organization.userId !== userId) {
+  if (!campanha) throw new Error("Campanha não encontrada");
+  if (campanha.organization.userId !== userId)
     throw new Error("Acesso não permitido");
-  }
-
-  if (campanha.status === "CANCELED" || campanha.status === "COMPLETED") {
-    throw new Error("Campanha não pode ser cancelada");
-  }
-
+  if (campanha.status !== "ACTIVE")
+    throw new Error("Campanha não pode ser concluída");
   return prisma.campaign.update({
     where: { id },
-    data: {
-      status: "CANCELED",
-    },
+    data: { status: "COMPLETED", completionReason: "MANUAL" },
   });
 }
 

@@ -4,6 +4,7 @@ import {
   buscarCampanhasPublicas,
   buscarCategorias,
   cancelarCampanhaController,
+  concluirCampanhaController,
   detalhesCampanha,
 } from "../controllers/campaigns.controller.js";
 import { cadastrarCampanha } from "../controllers/campaigns.controller.js";
@@ -27,6 +28,13 @@ router.patch(
   autenticar,
   autorizar("NGO"),
   cancelarCampanhaController,
+);
+
+router.patch(
+  "/campaigns/:id/complete",
+  autenticar,
+  autorizar("NGO"),
+  concluirCampanhaController,
 );
 
 export default router;

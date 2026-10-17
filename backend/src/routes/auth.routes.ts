@@ -1,8 +1,13 @@
 import { Router } from "express";
-import { cadastrarDoador } from "../controllers/auth.controller.js";
+import {
+  cadastrarDoador,
+  cadastrarONG,
+} from "../controllers/auth.controller.js";
 
 const router = Router();
 
 router.post("/register/donor", cadastrarDoador);
+
+router.post("/register/ngo", cadastrarONG);
 
 export default router;

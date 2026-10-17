@@ -95,3 +95,26 @@ export async function criarONG(dados: DadosONG) {
 
   return usuario;
 }
+
+export async function fazerLogin(email: string, password: string) {
+  const usuario = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!usuario) {
+    throw new Error("E-mail ou senha inválidos");
+  }
+
+  const senhaValida = await bcrypt.compare(password, usuario.passwordHash);
+
+  if (!senhaValida) {
+    throw new Error("E-mail ou senha inválidos");
+  }
+
+  return {
+    id: usuario.id,
+    name: usuario.name,
+    email: usuario.email,
+    role: usuario.role,
+  };
+}

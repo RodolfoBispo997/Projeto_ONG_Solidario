@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
-import { criarDoador, criarONG } from "../services/auth.service.js";
+import { criarDoador, criarONG, fazerLogin } from "../services/auth.service.js";
+import { gerarToken } from "../lib/jwt.js";
+import { prisma } from "../lib/prisma.js";
 
 export async function cadastrarDoador(req: Request, res: Response) {
   const { name, email, password } = req.body;
@@ -104,4 +106,65 @@ export async function cadastrarONG(req: Request, res: Response) {
       message: "Erro ao cadastrar ONG",
     });
   }
+}
+
+export async function login(req: Request, res: Response) {
+  const { email, password } = req.body;
+
+  if (
+    typeof email !== "string" ||
+    typeof password !== "string" ||
+    !email.trim() ||
+    !password
+  ) {
+    return res.status(400).json({
+      message: "Informe e-mail e senha",
+    });
+  }
+
+  try {
+    const usuario = await fazerLogin(email.trim().toLowerCase(), password);
+    const token = gerarToken(usuario.id, usuario.role);
+
+    return res.status(200).json({
+      message: "Login realizado com sucesso",
+      token,
+      user: usuario,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "E-mail ou senha inválidos"
+    ) {
+      return res.status(401).json({
+        message: "E-mail ou senha inválidos",
+      });
+    }
+
+    return res.status(500).json({
+      message: "Erro ao realizar login",
+    });
+  }
+}
+
+export async function usuarioAtual(req: Request, res: Response) {
+  const { id } = res.locals.user;
+
+  const usuario = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  });
+
+  if (!usuario) {
+    return res.status(404).json({
+      message: "Usuário não encontrado",
+    });
+  }
+
+  return res.json(usuario);
 }

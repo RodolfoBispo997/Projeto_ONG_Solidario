@@ -16,6 +16,17 @@ type DadosCampanha = {
   endDate?: string;
 };
 
+type EdicaoCampanha = {
+  title?: string;
+  description?: string;
+  categoryId?: string;
+  goalQuantity?: number;
+  unit?: string;
+  startDate?: string;
+  endDate?: string | null;
+  status?: "DRAFT" | "ACTIVE";
+};
+
 export async function criarCampanha(userId: string, dados: DadosCampanha) {
   const ong = await prisma.organization.findUnique({
     where: { userId },
@@ -108,6 +119,70 @@ export async function buscarCampanhaPorId(id: string) {
           state: true,
         },
       },
+    },
+  });
+}
+
+export async function editarCampanha(
+  id: string,
+  userId: string,
+  dados: EdicaoCampanha,
+) {
+  const campanha = await prisma.campaign.findUnique({
+    where: { id },
+    include: { organization: true },
+  });
+
+  if (!campanha) {
+    throw new Error("Campanha não encontrada");
+  }
+
+  if (campanha.organization.userId !== userId) {
+    throw new Error("Acesso não permitido");
+  }
+
+  if (campanha.status === "COMPLETED" || campanha.status === "CANCELED") {
+    throw new Error("Campanha não pode ser editada");
+  }
+
+  if (campanha.status === "ACTIVE" && dados.status === "DRAFT") {
+    throw new Error("Campanha ativa não pode voltar para rascunho");
+  }
+
+  if (dados.categoryId) {
+    const categoria = await prisma.category.findUnique({
+      where: { id: dados.categoryId },
+    });
+
+    if (!categoria) {
+      throw new Error("Categoria não encontrada");
+    }
+  }
+
+  const inicio = dados.startDate
+    ? new Date(dados.startDate)
+    : campanha.startDate;
+
+  const fim =
+    dados.endDate === null
+      ? null
+      : dados.endDate
+        ? new Date(dados.endDate)
+        : campanha.endDate;
+
+  if (
+    Number.isNaN(inicio.getTime()) ||
+    (fim && (Number.isNaN(fim.getTime()) || fim < inicio))
+  ) {
+    throw new Error("Datas inválidas");
+  }
+
+  return prisma.campaign.update({
+    where: { id },
+    data: {
+      ...dados,
+      startDate: dados.startDate ? inicio : undefined,
+      endDate: dados.endDate !== undefined ? fim : undefined,
     },
   });
 }

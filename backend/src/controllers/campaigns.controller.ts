@@ -4,6 +4,7 @@ import {
   criarCampanha,
   listarCampanhasPublicas,
   buscarCampanhaPorId,
+  editarCampanha,
 } from "../services/campaigns.service.js";
 
 export async function buscarCategorias(req: Request, res: Response) {
@@ -134,6 +135,102 @@ export async function detalhesCampanha(req: Request, res: Response) {
   } catch {
     return res.status(500).json({
       message: "Erro ao buscar campanha",
+    });
+  }
+}
+
+export async function atualizarCampanha(req: Request, res: Response) {
+  const id = req.params.id;
+
+  if (typeof id !== "string" || !id.trim()) {
+    return res.status(400).json({ message: "ID inválido" });
+  }
+
+  const dados = req.body;
+
+  if (!dados || typeof dados !== "object" || Array.isArray(dados)) {
+    return res.status(400).json({ message: "Dados inválidos" });
+  }
+
+  const campos = [
+    "title",
+    "description",
+    "categoryId",
+    "goalQuantity",
+    "unit",
+    "startDate",
+    "endDate",
+    "status",
+  ];
+
+  if (
+    Object.keys(dados).length === 0 ||
+    Object.keys(dados).some((campo) => !campos.includes(campo))
+  ) {
+    return res.status(400).json({ message: "Campos inválidos" });
+  }
+
+  for (const campo of ["title", "description", "categoryId", "unit"]) {
+    if (
+      dados[campo] !== undefined &&
+      (typeof dados[campo] !== "string" || !dados[campo].trim())
+    ) {
+      return res.status(400).json({ message: "Dados inválidos" });
+    }
+  }
+
+  if (
+    dados.goalQuantity !== undefined &&
+    (typeof dados.goalQuantity !== "number" ||
+      !Number.isFinite(dados.goalQuantity) ||
+      dados.goalQuantity <= 0)
+  ) {
+    return res.status(400).json({ message: "Meta inválida" });
+  }
+
+  if (
+    dados.status !== undefined &&
+    dados.status !== "DRAFT" &&
+    dados.status !== "ACTIVE"
+  ) {
+    return res.status(400).json({ message: "Status inválido" });
+  }
+
+  if (
+    (dados.startDate !== undefined && typeof dados.startDate !== "string") ||
+    (dados.endDate !== undefined &&
+      dados.endDate !== null &&
+      typeof dados.endDate !== "string")
+  ) {
+    return res.status(400).json({
+      message: "Datas inválidas",
+    });
+  }
+
+  try {
+    const campanha = await editarCampanha(id, res.locals.user.id, dados);
+
+    return res.status(200).json(campanha);
+  } catch (error) {
+    if (error instanceof Error) {
+      const mensagens: Record<string, number> = {
+        "Campanha não encontrada": 404,
+        "Acesso não permitido": 403,
+        "Campanha não pode ser editada": 409,
+        "Categoria não encontrada": 404,
+        "Datas inválidas": 400,
+        "Campanha ativa não pode voltar para rascunho": 409,
+      };
+
+      const status = mensagens[error.message];
+
+      if (status) {
+        return res.status(status).json({ message: error.message });
+      }
+    }
+
+    return res.status(500).json({
+      message: "Erro ao editar campanha",
     });
   }
 }

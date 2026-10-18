@@ -38,6 +38,7 @@ export async function cadastrarCampanha(req: Request, res: Response) {
     !unit.trim() ||
     typeof goalQuantity !== "number" ||
     !Number.isFinite(goalQuantity) ||
+    !Number.isInteger(goalQuantity) ||
     goalQuantity <= 0
   ) {
     return res.status(400).json({
@@ -200,6 +201,7 @@ export async function atualizarCampanha(req: Request, res: Response) {
     dados.goalQuantity !== undefined &&
     (typeof dados.goalQuantity !== "number" ||
       !Number.isFinite(dados.goalQuantity) ||
+      !Number.isInteger(dados.goalQuantity) ||
       dados.goalQuantity <= 0)
   ) {
     return res.status(400).json({ message: "Meta inválida" });
@@ -306,6 +308,10 @@ export async function concluirCampanhaController(req: Request, res: Response) {
       "Acesso não permitido": 403,
       "Campanha não pode ser concluída": 409,
     };
-    return res.status(status[message] ?? 500).json({ message: status[message] ? message : "Erro ao concluir campanha" });
+    return res
+      .status(status[message] ?? 500)
+      .json({
+        message: status[message] ? message : "Erro ao concluir campanha",
+      });
   }
 }

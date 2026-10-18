@@ -31,13 +31,17 @@ export async function obterDashboardOng(userId: string) {
   const doacoesRecebidas = campanhas.flatMap((campanha) =>
     campanha.donations.map((doacao) => ({ ...doacao, campanha })),
   );
-  const quantidadeRecebida = doacoesRecebidas.reduce(
-    (total, doacao) => total + doacao.quantity,
-    0,
-  );
   const doadoresUnicos = new Set(
     doacoesRecebidas.map((doacao) => doacao.donorId),
   );
+  const recebidaPorUnidade = new Map<string, number>();
+  for (const doacao of doacoesRecebidas) {
+    const unidade = doacao.campanha.unit;
+    recebidaPorUnidade.set(
+      unidade,
+      (recebidaPorUnidade.get(unidade) ?? 0) + doacao.quantity,
+    );
+  }
 
   const arrecadacaoPorMes = new Map<
     string,
@@ -107,7 +111,9 @@ export async function obterDashboardOng(userId: string) {
     ).length,
     completedCampaigns: concluidas,
     totalReceivedDonations: doacoesRecebidas.length,
-    receivedQuantity: quantidadeRecebida,
+    receivedQuantityByUnit: [...recebidaPorUnidade.entries()].map(
+      ([unit, quantity]) => ({ unit, quantity }),
+    ),
     uniqueDonors: doadoresUnicos.size,
     completionRate: totalCampanhas
       ? arredondar((concluidas / totalCampanhas) * 100)

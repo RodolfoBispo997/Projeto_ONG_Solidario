@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 
 const campanhaPublicaWhere = (agora: Date) => ({
   status: "ACTIVE" as const,
@@ -71,53 +72,75 @@ export async function listarDoacoesDaOng(userId: string) {
   });
 }
 
+async function confirmarDoacaoEmTransacao(donationId: string, userId: string) {
+  return prisma.$transaction(
+    async (tx) => {
+      const doacao = await tx.donation.findUnique({
+        where: { id: donationId },
+        include: { campaign: { include: { organization: true } } },
+      });
+
+      if (!doacao) throw new Error("Doação não encontrada");
+      if (doacao.campaign.organization.userId !== userId) {
+        throw new Error("Acesso não permitido");
+      }
+      if (doacao.campaign.status !== "ACTIVE") {
+        throw new Error("Campanha não disponível");
+      }
+      if (doacao.status !== "PENDING") {
+        throw new Error("Doação não está pendente");
+      }
+
+      const atualizada = await tx.donation.updateMany({
+        where: { id: donationId, status: "PENDING" },
+        data: { status: "RECEIVED", receivedAt: new Date() },
+      });
+
+      if (atualizada.count !== 1) throw new Error("Doação não está pendente");
+
+      const soma = await tx.donation.aggregate({
+        where: { campaignId: doacao.campaignId, status: "RECEIVED" },
+        _sum: { quantity: true },
+      });
+      const receivedQuantity = soma._sum.quantity ?? 0;
+      const status =
+        receivedQuantity >= doacao.campaign.goalQuantity
+          ? "COMPLETED"
+          : "ACTIVE";
+
+      const campanha = await tx.campaign.update({
+        where: { id: doacao.campaignId },
+        data: {
+          receivedQuantity,
+          status,
+          completionReason: status === "COMPLETED" ? "GOAL_REACHED" : null,
+        },
+      });
+
+      return {
+        donation: { ...doacao, status: "RECEIVED", receivedAt: new Date() },
+        campaign: campanha,
+      };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+}
+
 export async function confirmarDoacao(donationId: string, userId: string) {
-  return prisma.$transaction(async (tx) => {
-    const doacao = await tx.donation.findUnique({
-      where: { id: donationId },
-      include: { campaign: { include: { organization: true } } },
-    });
-
-    if (!doacao) throw new Error("Doação não encontrada");
-    if (doacao.campaign.organization.userId !== userId) {
-      throw new Error("Acesso não permitido");
+  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+    try {
+      return await confirmarDoacaoEmTransacao(donationId, userId);
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2034" ||
+        tentativa === 2
+      ) {
+        throw error;
+      }
     }
-    if (doacao.campaign.status !== "ACTIVE") {
-      throw new Error("Campanha não disponível");
-    }
-    if (doacao.status !== "PENDING") {
-      throw new Error("Doação não está pendente");
-    }
-
-    const atualizada = await tx.donation.updateMany({
-      where: { id: donationId, status: "PENDING" },
-      data: { status: "RECEIVED", receivedAt: new Date() },
-    });
-
-    if (atualizada.count !== 1) throw new Error("Doação não está pendente");
-
-    const soma = await tx.donation.aggregate({
-      where: { campaignId: doacao.campaignId, status: "RECEIVED" },
-      _sum: { quantity: true },
-    });
-    const receivedQuantity = soma._sum.quantity ?? 0;
-    const status =
-      receivedQuantity >= doacao.campaign.goalQuantity ? "COMPLETED" : "ACTIVE";
-
-    const campanha = await tx.campaign.update({
-      where: { id: doacao.campaignId },
-      data: {
-        receivedQuantity,
-        status,
-        completionReason: status === "COMPLETED" ? "GOAL_REACHED" : null,
-      },
-    });
-
-    return {
-      donation: { ...doacao, status: "RECEIVED", receivedAt: new Date() },
-      campaign: campanha,
-    };
-  });
+  }
+  throw new Error("Falha ao confirmar doação");
 }
 
 export async function cancelarDoacao(donationId: string, donorId: string) {

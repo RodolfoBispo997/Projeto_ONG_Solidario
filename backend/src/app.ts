@@ -2,6 +2,7 @@ import express from "express";
 import authRoutes from "./routes/auth.routes.js";
 import campaignRoutes from "./routes/campaigns.routes.js";
 import donationsRoutes from "./routes/donations.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
 
 const app = express();
 
@@ -15,5 +16,6 @@ app.use("/auth", authRoutes);
 
 app.use(campaignRoutes);
 app.use(donationsRoutes);
+app.use(dashboardRoutes);
 
 export default app;
